@@ -1,0 +1,350 @@
+from sys import hash_info
+from typing import List, Set, Tuple
+from dataclasses import dataclass
+
+
+@dataclass
+class Board:
+    content: List[List[int]]
+    interation: int = 0
+
+
+def pprint(board: Board):
+    for row in board.content:
+        print(row)
+
+
+def is_done(board: Board):
+    if any([0 in x for x in board.content]):
+        return False
+    else:
+        return True
+
+
+def find_grid(row: int, col: int) -> List[Tuple[int, int]]:
+    top_left_row = row // 3 * 3
+    top_left_col = col // 3 * 3
+
+    return [
+        (x, y)
+        for x in [top_left_row + i for i in range(3)]
+        for y in [top_left_col + j for j in range(3)]
+    ]
+
+
+def row_removal(
+    value: int,
+    row: int,
+    all_possibilities: List[List[set]],
+    exclude_cells: List[Tuple[int, int]] = None,
+) -> bool:
+    """ """
+    # print(f"removing {value} in row {row}")
+    has_input = False
+    for col, possibilities_of_a_cell in enumerate(all_possibilities[row]):
+        if value in possibilities_of_a_cell:
+            if exclude_cells:
+                if (row, col) not in exclude_cells:
+                    has_input = True
+                    possibilities_of_a_cell.remove(value)
+            else:
+                has_input = True
+                possibilities_of_a_cell.remove(value)
+    return has_input
+
+
+def col_removal(
+    value: int,
+    col: int,
+    all_possibilities: List[List[set]],
+    exclude_cells: List[Tuple[int, int]] = None,
+):
+    """ """
+    has_input = False
+    for row, possibilities_of_a_cell in enumerate([x[col] for x in all_possibilities]):
+        if value in possibilities_of_a_cell:
+            if exclude_cells:
+                if (row, col) not in exclude_cells:
+                    has_input = True
+                    possibilities_of_a_cell.remove(value)
+            else:
+                has_input = True
+                possibilities_of_a_cell.remove(value)
+    return has_input
+
+
+def grid_removal(
+    value: int, row: int, col: int, all_possibilities: List[List[set]]
+) -> bool:
+    # print(f"removing {value} in the grid of {row},{col}")
+    has_input = False
+    for i, j in find_grid(row=row, col=col):
+        if value in all_possibilities[i][j]:
+            has_input = True
+            all_possibilities[i][j].remove(value)
+    return has_input
+
+
+def simle_removal_one_loc(
+    board: Board,
+    row: int,
+    col: int,
+    removed_locations: Set[Tuple[int, int]],
+    all_possibilities: List[List[set]],
+) -> bool:
+    value = board.content[row][col]
+    if value == 0:
+        return
+
+    if (row, col) in removed_locations:
+        return
+
+    # row removal
+    has_input_row = row_removal(
+        value=value, row=row, all_possibilities=all_possibilities
+    )
+
+    # col removal
+    has_input_col = col_removal(
+        value=value, col=col, all_possibilities=all_possibilities
+    )
+
+    # 3*3 removal
+    has_input_grid = grid_removal(
+        value=value, row=row, col=col, all_possibilities=all_possibilities
+    )
+
+    # self removal
+    has_self_input = False
+    if all_possibilities[row][col]:
+        has_self_input = True
+        all_possibilities[row][col] = set()
+    removed_locations.add((row, col))
+    return has_input_row or has_input_grid or has_input_col or has_self_input
+
+
+def simple_removal(
+    board: Board,
+    removed_locations: Set[Tuple[int, int]],
+    all_possibilities: List[List[set]],
+) -> bool:
+    """remove the number from possibilities in same row / col / grid"""
+    has_input = False
+    for i in range(9):
+        for j in range(9):
+            has_input_one_loc = simle_removal_one_loc(
+                board=board,
+                row=i,
+                col=j,
+                removed_locations=removed_locations,
+                all_possibilities=all_possibilities,
+            )
+            has_input = has_input_one_loc or has_input
+    return has_input
+
+
+def grid_fill(
+    board: Board,
+    removed_locations: Set[Tuple[int, int]],
+    all_possibilities: List[List[set]],
+) -> bool:
+    """in a grid's perspective, fill number if possible,
+    also does not possibility removal if possible
+    (all possibilities of a number lies same row or col)"""
+    has_input = False
+    for i in range(3):
+        for j in range(3):
+            grid_locations = [
+                (x, y)
+                for x in [3 * i + x for x in range(3)]
+                for y in [3 * j + x for x in range(3)]
+            ]
+
+            for value in [x + 1 for x in range(9)]:
+                if value in [
+                    board.content[cell[0]][cell[1]] for cell in grid_locations
+                ]:
+                    # we already filled it
+                    continue
+
+                possible_locations_for_a_value: List[Tuple[int, int]] = []
+                for row, col in grid_locations:
+                    if value in all_possibilities[row][col]:
+                        possible_locations_for_a_value.append((row, col))
+
+                if len(possible_locations_for_a_value) == 1:
+                    # fill we can fill it!!!!
+                    has_input = True
+                    x, y = possible_locations_for_a_value.pop()
+                    board.content[x][y] = value
+                    print(f"GRID filling {x},{y} with {value}")
+                    simle_removal_one_loc(
+                        board=board,
+                        row=x,
+                        col=y,
+                        removed_locations=removed_locations,
+                        all_possibilities=all_possibilities,
+                    )
+                elif len(possible_locations_for_a_value) > 0:
+                    # check if all possible results of a value in the same row
+                    if all(
+                        [
+                            loc[0] == possible_locations_for_a_value[0][0]
+                            for loc in possible_locations_for_a_value
+                        ]
+                    ):
+                        # print(
+                        #     f"GRID INSIGHTS: removal {value} from row {possible_locations[0][0]}"
+                        # )
+                        has_input = row_removal(
+                            value=value,
+                            row=possible_locations_for_a_value[0][0],
+                            all_possibilities=all_possibilities,
+                            exclude_cells=grid_locations,
+                        )
+
+                    # check if all possible results of a value in the same col
+                    if all(
+                        [
+                            loc[1] == possible_locations_for_a_value[0][1]
+                            for loc in possible_locations_for_a_value
+                        ]
+                    ):
+                        # print(
+                        #     f"GRID INSIGHTS: removal {value} from col {possible_locations[0][1]}"
+                        # )
+                        has_input = col_removal(
+                            value=value,
+                            col=possible_locations_for_a_value[0][1],
+                            all_possibilities=all_possibilities,
+                            exclude_cells=grid_locations,
+                        )
+
+    return has_input
+
+
+def simple_fill(
+    board: Board,
+    all_possibilities: List[List[set]],
+) -> bool:
+    has_input = False
+    for i in range(9):
+        for j in range(9):
+            if board.content[i][j] == 0 and len(all_possibilities[i][j]) == 1:
+                v = all_possibilities[i][j].pop()
+                board.content[i][j] = v
+                print(f"SIMPLE filling {i},{j} with {v}")
+                has_input = True
+    return has_input
+
+
+def print_all_possibilities(all_possibilities: List[List[set]]):
+    for row in range(9):
+        for col in range(9):
+            print(f"LOC[{row}][{col}] is possibly {all_possibilities[row][col]}")
+
+
+def solve(board: Board) -> Board:
+
+    all_possibilities: List[List[set]] = [
+        [set([1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(9)] for _ in range(9)
+    ]
+    removed_locations: Set[Tuple[int, int]] = set()
+
+    def do_an_iteration(
+        board: Board,
+        all_possibilities: List[List[set]],
+        removed_locations: Set[Tuple[int, int]],
+    ):
+        if is_done(board):
+            print("WELL ITS DONE!!!")
+            return board
+
+        has_input_simple_removal = simple_removal(
+            board=board,
+            removed_locations=removed_locations,
+            all_possibilities=all_possibilities,
+        )
+
+        has_input_grid_fill = grid_fill(
+            board=board,
+            removed_locations=removed_locations,
+            all_possibilities=all_possibilities,
+        )
+
+        has_input_simple_fill = simple_fill(
+            board=board,
+            all_possibilities=all_possibilities,
+        )
+
+        # print(has_input_simple_removal, has_input_grid_fill, has_input_simple_fill)
+        board_changed = (
+            has_input_simple_removal or has_input_grid_fill or has_input_simple_fill
+        )
+
+        # print the result
+        board.interation += 1
+        # print(f"interation {board.interation} done")
+        if not board_changed:
+            print_all_possibilities(all_possibilities=all_possibilities)
+            print(f"CANNOT FINISH...AFTER ITERATION {board.interation}")
+            return board
+
+        return do_an_iteration(
+            board=board,
+            all_possibilities=all_possibilities,
+            removed_locations=removed_locations,
+        )
+
+    return do_an_iteration(
+        board=board,
+        all_possibilities=all_possibilities,
+        removed_locations=removed_locations,
+    )
+
+
+def convert_string_input_to_board(input_strs: List[str]) -> Board:
+    """each row is a row"""
+    b = Board(content=[])
+    for row in input_strs:
+        b.content.append([int(x) for x in row])
+    return b
+
+
+if __name__ == "__main__":
+    # board_content_easy = [
+    #     [0, 0, 0, 6, 7, 0, 5, 4, 2],
+    #     [0, 0, 4, 0, 9, 5, 3, 0, 6],
+    #     [0, 0, 5, 0, 0, 0, 8, 1, 0],
+    #     [0, 1, 2, 8, 0, 0, 0, 0, 4],
+    #     [0, 5, 0, 3, 4, 2, 7, 0, 0],
+    #     [4, 0, 7, 0, 0, 1, 6, 0, 3],
+    #     [0, 4, 0, 0, 1, 0, 0, 3, 8],
+    #     [0, 6, 0, 7, 0, 4, 0, 0, 5],
+    #     [0, 0, 0, 2, 0, 0, 0, 6, 7],
+    # ]
+
+    # easy_board = Board(content=board_content_easy)
+    # board_solved = solve(board=easy_board)
+
+    hard_board = convert_string_input_to_board(
+        input_strs=[
+            "106003000",
+            "000000200",
+            "003000074",
+            "000000000",
+            "010045003",
+            "400028560",
+            "600700002",
+            "805000000",
+            "090080000",
+        ]
+    )
+    pprint(hard_board)
+    board_solved = solve(board=hard_board)
+    pprint(board_solved)
+    # print(is_done(board))
+
+    # print(find_grid(0, 0))
+
+    # print(find_grid(4, 3))
