@@ -1,3 +1,4 @@
+from re import A
 from sys import hash_info
 from typing import List, Set, Tuple
 from dataclasses import dataclass
@@ -151,7 +152,9 @@ def grid_fill(
     """in a grid's perspective, fill number if possible,
     also does not possibility removal if possible
     (all possibilities of a number lies same row or col)"""
-    has_input = False
+    has_input_fill = False
+    has_input_row = False
+    has_input_col = False
     for i in range(3):
         for j in range(3):
             grid_locations = [
@@ -174,7 +177,7 @@ def grid_fill(
 
                 if len(possible_locations_for_a_value) == 1:
                     # fill we can fill it!!!!
-                    has_input = True
+                    has_input_fill = True
                     x, y = possible_locations_for_a_value.pop()
                     board.content[x][y] = value
                     print(f"GRID filling {x},{y} with {value}")
@@ -193,10 +196,7 @@ def grid_fill(
                             for loc in possible_locations_for_a_value
                         ]
                     ):
-                        # print(
-                        #     f"GRID INSIGHTS: removal {value} from row {possible_locations[0][0]}"
-                        # )
-                        has_input = row_removal(
+                        has_input_row = has_input_row or row_removal(
                             value=value,
                             row=possible_locations_for_a_value[0][0],
                             all_possibilities=all_possibilities,
@@ -210,17 +210,13 @@ def grid_fill(
                             for loc in possible_locations_for_a_value
                         ]
                     ):
-                        # print(
-                        #     f"GRID INSIGHTS: removal {value} from col {possible_locations[0][1]}"
-                        # )
-                        has_input = col_removal(
+                        has_input_col = has_input_col or col_removal(
                             value=value,
                             col=possible_locations_for_a_value[0][1],
                             all_possibilities=all_possibilities,
                             exclude_cells=grid_locations,
                         )
-
-    return has_input
+    return has_input_col or has_input_row or has_input_fill
 
 
 def simple_fill(
@@ -284,7 +280,8 @@ def solve(board: Board) -> Board:
 
         # print the result
         board.interation += 1
-        # print(f"interation {board.interation} done")
+        print(f"interation {board.interation} done")
+        print(has_input_simple_removal, has_input_grid_fill, has_input_simple_fill)
         if not board_changed:
             print_all_possibilities(all_possibilities=all_possibilities)
             print(f"CANNOT FINISH...AFTER ITERATION {board.interation}")
@@ -342,6 +339,8 @@ if __name__ == "__main__":
     )
     pprint(hard_board)
     board_solved = solve(board=hard_board)
+    # board_solved = solve(board=board_solved)
+    # board_solved = solve(board=board_solved)
     pprint(board_solved)
     # print(is_done(board))
 
