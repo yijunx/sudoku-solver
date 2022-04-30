@@ -1,7 +1,8 @@
 from re import A
-from sys import hash_info
 from typing import List, Set, Tuple
 from dataclasses import dataclass
+
+from exceptions import SolveError
 
 
 @dataclass
@@ -164,11 +165,11 @@ def grid_fill(
             ]
 
             for value in [x + 1 for x in range(9)]:
-                if value in [
-                    board.content[cell[0]][cell[1]] for cell in grid_locations
-                ]:
-                    # we already filled it
-                    continue
+                # if value in [
+                #     board.content[cell[0]][cell[1]] for cell in grid_locations
+                # ]:
+                #     # we already filled it
+                #     continue
 
                 possible_locations_for_a_value: List[Tuple[int, int]] = []
                 for row, col in grid_locations:
@@ -178,6 +179,11 @@ def grid_fill(
                 if len(possible_locations_for_a_value) == 1:
                     # fill we can fill it!!!!
                     has_input_fill = True
+                    if value in [
+                        board.content[cell[0]][cell[1]] for cell in grid_locations
+                    ]:
+                        # we already filled it
+                        raise SolveError(f"{value} is already in {grid_locations}")
                     x, y = possible_locations_for_a_value.pop()
                     board.content[x][y] = value
                     print(f"GRID filling {x},{y} with {value}")
@@ -231,6 +237,8 @@ def simple_fill(
                 board.content[i][j] = v
                 print(f"SIMPLE filling {i},{j} with {v}")
                 has_input = True
+            if board.content[i][j] == 0 and len(all_possibilities[i][j]) == 0:
+                raise SolveError(f"cell {i},{j} has no value possible")
     return has_input
 
 
@@ -240,7 +248,7 @@ def print_all_possibilities(all_possibilities: List[List[set]]):
             print(f"LOC[{row}][{col}] is possibly {all_possibilities[row][col]}")
 
 
-def solve(board: Board) -> Board:
+def logical_solve(board: Board) -> Board:
 
     all_possibilities: List[List[set]] = [
         [set([1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(9)] for _ in range(9)
@@ -300,6 +308,43 @@ def solve(board: Board) -> Board:
     )
 
 
+def simple_check_assumption_validity(board: Board, row: int, col: int):
+    values_in_row = [x for x in board.content[row] if x]
+    if len(values_in_row) > len(set(values_in_row)):
+        raise SolveError(f"There are duplicates in row {row}")
+    values_in_col = [x[col] for x in board.content if x[col]]
+    if len(values_in_col) > len(set(values_in_col)):
+        raise SolveError(f"There are duplicates in col {row}")
+    values_in_grid = [board.content[cell[0]][cell[1]] for cell in find_grid(row=row, col=col)]
+    values_in_grid = [x for x in values_in_grid if x]
+    if len(values_in_grid) > len(set(values_in_grid)):
+        raise SolveError(f"There are duplicates in the grid of {row},{col}")
+
+
+
+def brutal_solve(board: Board):
+
+    initial_board = Board(content=board.content.copy())
+
+    for i in range(9):
+        for j in range(9):
+            if board.content[i][j] == 0:
+                possibilities = set(list(range(9)))
+                while possibilities:
+                    board.content[i][j] = possibilities.pop()
+                    print(f"assuming cell {i},{j} is {board.content[i][j]}")
+                    try:
+                        simple_check_assumption_validity(board, row=i, col=j)
+                        bruted_board = logical_solve(board=board)
+                        if is_done(bruted_board):
+                            return bruted_board
+                        else:
+                            board = brutal_solve(board=bruted_board)  # bruted_board = brutal_solve(board=bruted_board)
+                    except SolveError:
+                        board = Board(content=initial_board.content.copy())
+                        print(f"cell {i},{j} cannot be {board.content[i][j]}")
+
+
 def convert_string_input_to_board(input_strs: List[str]) -> Board:
     """each row is a row"""
     b = Board(content=[])
@@ -338,9 +383,10 @@ if __name__ == "__main__":
         ]
     )
     pprint(hard_board)
-    board_solved = solve(board=hard_board)
+    board_solved = logical_solve(board=hard_board)
     # board_solved = solve(board=board_solved)
-    # board_solved = solve(board=board_solved)
+    # pprint(board_solved)
+    # board_solved = brutal_solve(board=board_solved)
     pprint(board_solved)
     # print(is_done(board))
 
