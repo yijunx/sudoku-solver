@@ -1,26 +1,22 @@
-from re import A
 from typing import List, Set, Tuple
-from dataclasses import dataclass
-
 from exceptions import SolveError
 
 
-@dataclass
 class Board:
-    content: List[List[int]]
-    interation: int = 0
+    def __init__(self, content: List[List[int]]) -> None:
+        self.content = [x.copy() for x in content]
+        self.interation: int = 0
 
+    @property
+    def is_done(self) -> bool:
+        if any([0 in x for x in self.content]):
+            return False
+        else:
+            return True
 
-def pprint(board: Board):
-    for row in board.content:
-        print(row)
-
-
-def is_done(board: Board):
-    if any([0 in x for x in board.content]):
-        return False
-    else:
-        return True
+    def pprint(self) -> None:
+        for row in self.content:
+            print(row)
 
 
 def find_grid(row: int, col: int) -> List[Tuple[int, int]]:
@@ -248,11 +244,12 @@ def print_all_possibilities(all_possibilities: List[List[set]]):
             print(f"LOC[{row}][{col}] is possibly {all_possibilities[row][col]}")
 
 
-def logical_solve(board: Board) -> Board:
+def logical_solve(board: Board, all_possibilities: List[List[set]] = None) -> Board:
 
-    all_possibilities: List[List[set]] = [
-        [set([1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(9)] for _ in range(9)
-    ]
+    if all_possibilities is None:
+        all_possibilities: List[List[set]] = [
+            [set([1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(9)] for _ in range(9)
+        ]
     removed_locations: Set[Tuple[int, int]] = set()
 
     def do_an_iteration(
@@ -260,7 +257,7 @@ def logical_solve(board: Board) -> Board:
         all_possibilities: List[List[set]],
         removed_locations: Set[Tuple[int, int]],
     ):
-        if is_done(board):
+        if board.is_done:
             print("WELL ITS DONE!!!")
             return board
 
@@ -315,31 +312,39 @@ def simple_check_assumption_validity(board: Board, row: int, col: int):
     values_in_col = [x[col] for x in board.content if x[col]]
     if len(values_in_col) > len(set(values_in_col)):
         raise SolveError(f"There are duplicates in col {row}")
-    values_in_grid = [board.content[cell[0]][cell[1]] for cell in find_grid(row=row, col=col)]
+    values_in_grid = [
+        board.content[cell[0]][cell[1]] for cell in find_grid(row=row, col=col)
+    ]
     values_in_grid = [x for x in values_in_grid if x]
     if len(values_in_grid) > len(set(values_in_grid)):
         raise SolveError(f"There are duplicates in the grid of {row},{col}")
 
 
+def brutal_solve(board: Board, all_possibilities: List[List[set]] = None):
 
-def brutal_solve(board: Board):
+    initial_board = Board(content=[x.copy() for x in board.content])
 
-    initial_board = Board(content=board.content.copy())
+    if all_possibilities is None:
+        all_possibilities: List[List[set]] = [
+            [set([1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(9)] for _ in range(9)
+        ]
 
     for i in range(9):
         for j in range(9):
-            if board.content[i][j] == 0:
-                possibilities = set(list(range(9)))
+            if board.content[i][j] == 0:  # if the cell is not filled
+                possibilities = all_possibilities  # set(list(range(9)))
                 while possibilities:
                     board.content[i][j] = possibilities.pop()
                     print(f"assuming cell {i},{j} is {board.content[i][j]}")
                     try:
                         simple_check_assumption_validity(board, row=i, col=j)
                         bruted_board = logical_solve(board=board)
-                        if is_done(bruted_board):
+                        if bruted_board.is_done:
                             return bruted_board
                         else:
-                            board = brutal_solve(board=bruted_board)  # bruted_board = brutal_solve(board=bruted_board)
+                            board = brutal_solve(
+                                board=bruted_board
+                            )  # bruted_board = brutal_solve(board=bruted_board)
                     except SolveError:
                         board = Board(content=initial_board.content.copy())
                         print(f"cell {i},{j} cannot be {board.content[i][j]}")
@@ -382,12 +387,14 @@ if __name__ == "__main__":
             "090080000",
         ]
     )
-    pprint(hard_board)
+    hard_board.pprint()
     board_solved = logical_solve(board=hard_board)
+
+    print("now i am going to use brutal force..")
     # board_solved = solve(board=board_solved)
     # pprint(board_solved)
     # board_solved = brutal_solve(board=board_solved)
-    pprint(board_solved)
+    board_solved.pprint()
     # print(is_done(board))
 
     # print(find_grid(0, 0))
