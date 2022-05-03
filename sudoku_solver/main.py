@@ -288,7 +288,7 @@ def logical_solve(board: Board, all_possibilities: List[List[set]] = None) -> Bo
         print(f"interation {board.interation} done")
         print(has_input_simple_removal, has_input_grid_fill, has_input_simple_fill)
         if not board_changed:
-            print_all_possibilities(all_possibilities=all_possibilities)
+            # print_all_possibilities(all_possibilities=all_possibilities)
             print(f"CANNOT FINISH...AFTER ITERATION {board.interation}")
             return board
 
@@ -320,21 +320,23 @@ def simple_check_assumption_validity(board: Board, row: int, col: int):
         raise SolveError(f"There are duplicates in the grid of {row},{col}")
 
 
-def brutal_solve(board: Board, all_possibilities: List[List[set]] = None):
+def brutal_solve(board: Board):
 
-    initial_board = Board(content=[x.copy() for x in board.content])
+    initial_board = Board(content=board.content)
 
-    if all_possibilities is None:
-        all_possibilities: List[List[set]] = [
-            [set([1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(9)] for _ in range(9)
-        ]
+    all_possibilities: List[List[set]] = [
+        [set([1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(9)] for _ in range(9)
+    ]
 
     for i in range(9):
         for j in range(9):
             if board.content[i][j] == 0:  # if the cell is not filled
-                possibilities = all_possibilities  # set(list(range(9)))
+                possibilities = all_possibilities[i][j].copy()  # set(list(range(9)))
                 while possibilities:
-                    board.content[i][j] = possibilities.pop()
+
+                    # fill one first
+                    value_to_fill = possibilities.pop()
+                    board.content[i][j] = value_to_fill
                     print(f"assuming cell {i},{j} is {board.content[i][j]}")
                     try:
                         simple_check_assumption_validity(board, row=i, col=j)
@@ -342,12 +344,16 @@ def brutal_solve(board: Board, all_possibilities: List[List[set]] = None):
                         if bruted_board.is_done:
                             return bruted_board
                         else:
-                            board = brutal_solve(
-                                board=bruted_board
-                            )  # bruted_board = brutal_solve(board=bruted_board)
+                            print("well, no solve error.. not finished also")
+
+                            # board = brutal_solve(
+                            #     board=bruted_board
+                            # )  # bruted_board = brutal_solve(board=bruted_board)
                     except SolveError:
-                        board = Board(content=initial_board.content.copy())
+                        board = Board(content=initial_board.content)
+                        all_possibilities[i][j].remove(value_to_fill)
                         print(f"cell {i},{j} cannot be {board.content[i][j]}")
+    raise SolveError("unsolvable!!!")
 
 
 def convert_string_input_to_board(input_strs: List[str]) -> Board:
@@ -359,20 +365,19 @@ def convert_string_input_to_board(input_strs: List[str]) -> Board:
 
 
 if __name__ == "__main__":
-    # board_content_easy = [
-    #     [0, 0, 0, 6, 7, 0, 5, 4, 2],
-    #     [0, 0, 4, 0, 9, 5, 3, 0, 6],
-    #     [0, 0, 5, 0, 0, 0, 8, 1, 0],
-    #     [0, 1, 2, 8, 0, 0, 0, 0, 4],
-    #     [0, 5, 0, 3, 4, 2, 7, 0, 0],
-    #     [4, 0, 7, 0, 0, 1, 6, 0, 3],
-    #     [0, 4, 0, 0, 1, 0, 0, 3, 8],
-    #     [0, 6, 0, 7, 0, 4, 0, 0, 5],
-    #     [0, 0, 0, 2, 0, 0, 0, 6, 7],
-    # ]
+    board_content_easy = [
+        [0, 0, 0, 6, 7, 0, 5, 4, 2],
+        [0, 0, 4, 0, 9, 5, 3, 0, 6],
+        [0, 0, 5, 0, 0, 0, 8, 1, 0],
+        [0, 1, 2, 8, 0, 0, 0, 0, 4],
+        [0, 5, 0, 3, 4, 2, 7, 0, 0],
+        [4, 0, 7, 0, 0, 1, 6, 0, 3],
+        [0, 4, 0, 0, 1, 0, 0, 3, 8],
+        [0, 6, 0, 7, 0, 4, 0, 0, 5],
+        [0, 0, 0, 2, 0, 0, 0, 6, 7],
+    ]
 
-    # easy_board = Board(content=board_content_easy)
-    # board_solved = solve(board=easy_board)
+    easy_board = Board(content=board_content_easy)
 
     hard_board = convert_string_input_to_board(
         input_strs=[
@@ -387,14 +392,44 @@ if __name__ == "__main__":
             "090080000",
         ]
     )
-    hard_board.pprint()
-    board_solved = logical_solve(board=hard_board)
+
+    master_board = convert_string_input_to_board(
+        input_strs=[
+            "005000000",
+            "600000900",
+            "100970053",
+            "063801200",
+            "002050000",
+            "000000017",
+            "080600000",
+            "000380090",
+            "070005002"
+        ]
+    )
+
+    grand_master_board = convert_string_input_to_board(
+        input_strs=[
+            "000020600",
+            "001800030",
+            "000700245",
+            "000640000",
+            "903107020",
+            "016003000",
+            "600400070",
+            "100000008",
+            "000005000"
+        ]
+    )
+
+    board = Board(content=grand_master_board.content)
+    board.pprint()
+    board = logical_solve(board=board)
 
     print("now i am going to use brutal force..")
-    # board_solved = solve(board=board_solved)
-    # pprint(board_solved)
-    # board_solved = brutal_solve(board=board_solved)
-    board_solved.pprint()
+    board = brutal_solve(board=board)
+
+
+    board.pprint()
     # print(is_done(board))
 
     # print(find_grid(0, 0))
