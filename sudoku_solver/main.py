@@ -1,4 +1,4 @@
-from typing import List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 from exceptions import SolveError
 
 
@@ -244,7 +244,9 @@ def print_all_possibilities(all_possibilities: List[List[set]]):
             print(f"LOC[{row}][{col}] is possibly {all_possibilities[row][col]}")
 
 
-def logical_solve(board: Board, all_possibilities: List[List[set]] = None) -> Board:
+def logical_solve(
+    board: Board, all_possibilities: List[List[set]] = None
+) -> Tuple[Board, List[List[set]]]:
 
     if all_possibilities is None:
         all_possibilities: List[List[set]] = [
@@ -259,7 +261,7 @@ def logical_solve(board: Board, all_possibilities: List[List[set]] = None) -> Bo
     ):
         if board.is_done:
             print("WELL ITS DONE!!!")
-            return board
+            return board, all_possibilities
 
         has_input_simple_removal = simple_removal(
             board=board,
@@ -290,7 +292,7 @@ def logical_solve(board: Board, all_possibilities: List[List[set]] = None) -> Bo
         if not board_changed:
             # print_all_possibilities(all_possibilities=all_possibilities)
             print(f"CANNOT FINISH...AFTER ITERATION {board.interation}")
-            return board
+            return board, all_possibilities
 
         return do_an_iteration(
             board=board,
@@ -320,13 +322,16 @@ def simple_check_assumption_validity(board: Board, row: int, col: int):
         raise SolveError(f"There are duplicates in the grid of {row},{col}")
 
 
-def brutal_solve(board: Board):
+def brutal_solve(board: Board, all_possibilities: List[List[set]] = None):
 
     initial_board = Board(content=board.content)
 
-    all_possibilities: List[List[set]] = [
-        [set([1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(9)] for _ in range(9)
-    ]
+    if all_possibilities is None:
+        all_possibilities = [
+            [set([1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(9)] for _ in range(9)
+        ]
+
+    assumptions: Dict[tuple, str] = {}
 
     for i in range(9):
         for j in range(9):
@@ -337,21 +342,25 @@ def brutal_solve(board: Board):
                     # fill one first
                     value_to_fill = possibilities.pop()
                     board.content[i][j] = value_to_fill
-                    print(f"assuming cell {i},{j} is {board.content[i][j]}")
+                    print(f"assuming cell {i},{j} is {value_to_fill}")
+                    assumptions[(i, j, value_to_fill)] = "UNKNOWN"
                     try:
                         simple_check_assumption_validity(board, row=i, col=j)
-                        bruted_board = logical_solve(board=board)
+                        bruted_board, _ = logical_solve(board=board)
                         if bruted_board.is_done:
+                            initial_board.pprint()
+                            assumptions[(i, j, value_to_fill)] = "JUST NICE"
+                            for k, v in assumptions.items():
+                                print(f"{k}: {v}")
                             return bruted_board
                         else:
                             print("well, no solve error.. not finished also")
-
-                            # board = brutal_solve(
-                            #     board=bruted_board
-                            # )  # bruted_board = brutal_solve(board=bruted_board)
-                    except SolveError:
+                    except SolveError as e:
                         board = Board(content=initial_board.content)
                         all_possibilities[i][j].remove(value_to_fill)
+                        assumptions[
+                            (i, j, value_to_fill)
+                        ] = f"CANNOT BE {value_to_fill}: {e}"
                         print(f"cell {i},{j} cannot be {board.content[i][j]}")
     raise SolveError("unsolvable!!!")
 
@@ -403,7 +412,7 @@ if __name__ == "__main__":
             "000000017",
             "080600000",
             "000380090",
-            "070005002"
+            "070005002",
         ]
     )
 
@@ -417,17 +426,17 @@ if __name__ == "__main__":
             "016003000",
             "600400070",
             "100000008",
-            "000005000"
+            "000005000",
         ]
     )
 
     board = Board(content=grand_master_board.content)
     board.pprint()
-    board = logical_solve(board=board)
+    board, remaining_possibilities = logical_solve(board=board)
 
-    print("now i am going to use brutal force..")
-    board = brutal_solve(board=board)
-
+    if not board.is_done:
+        print("now i am going to use brutal force..")
+        board = brutal_solve(board=board, all_possibilities=remaining_possibilities)
 
     board.pprint()
     # print(is_done(board))
